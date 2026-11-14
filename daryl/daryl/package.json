@@ -1,0 +1,16 @@
+{
+  "name": "daryl",
+  "version": "2.0.0",
+  "description": "Daryl: a lunar mission assistant with a self-diagnosing safety system around it",
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "start": "node server.js",
+    "daryl": "node daryl.js",
+    "doctor": "node doctor.js",
+    "sandbox": "node sandbox.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
