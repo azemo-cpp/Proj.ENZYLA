@@ -4,7 +4,7 @@ export interface ISSData {
   lat: string; lon: string; alt: string; vel: string; loaded: boolean;
 }
 
-export function useISS(): ISSData {
+export function useIss(): ISSData {
   const [data, setData] = useState<ISSData>({ lat: '--', lon: '--', alt: '--', vel: '--', loaded: false });
   useEffect(() => {
     async function fetch_() {

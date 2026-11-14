@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import Navbar from './components/Navbar';
-import HUD from './components/HUD';
-import MoonExplorer from './components/MoonExplorer';
-import SiteTimeline from './components/SiteTimeline';
-import DarylChat from './components/DarylChat';
+import Navbar from './components/navbar';
+import HUD from './components/hud';
+import MoonExplorer from './components/moonExplorer';
+import SiteTimeline from './components/siteTimeline';
+import DarylChat from './components/darylChat';
 
 interface MoonClickDetail { name: string; lat: number; lon: number; type: string; }
 
@@ -16,8 +16,15 @@ export default function App() {
       const d = (e as CustomEvent<MoonClickDetail>).detail;
       if (d?.name && d.name !== 'Lunar Surface') setActiveSite(d.name);
     }
+    function onZoomOut() {
+      setActiveSite('');
+    }
     window.addEventListener('moonclick', onZoomIn);
-    return () => window.removeEventListener('moonclick', onZoomIn);
+    window.addEventListener('moonexit', onZoomOut);
+    return () => {
+      window.removeEventListener('moonclick', onZoomIn);
+      window.removeEventListener('moonexit', onZoomOut);
+    };
   }, []);
 
   function handleTimelineSelect(name: string, lat: number, lon: number) {

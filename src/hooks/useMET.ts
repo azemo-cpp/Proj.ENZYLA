@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 
 function pad(n: number, w: number) { return String(n).padStart(w, '0'); }
 
-export function useMET() {
+export function useMet() {
   const [met, setMet] = useState('000:00:00:00');
   const [utc, setUtc] = useState('00:00:00');
   useEffect(() => {

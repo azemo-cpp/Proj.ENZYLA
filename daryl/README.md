@@ -54,7 +54,7 @@ API keys in environment variables, never in the code.
 | `doctor/`, `doctor.js` | The Ollama doctor that proposes fixes (never edits anything) |
 | `sandbox.js`, `doctor/sandbox.js` | Tests a proposed fix on a copy of the project |
 | `server/`, `server.js` | The web API |
-| `public/` | A demo page and a plain-script widget (the app uses `src/components/DarylChat.tsx` instead) |
+| `public/` | A demo page and a plain-script widget (the app uses `src/components/darylChat.tsx` instead) |
 
 ## Before putting it online
 

@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useMET } from '../hooks/useMET';
+import { useMet } from '../hooks/useMet';
 
 export default function Navbar() {
   const [isZoomed, setIsZoomed] = useState(false);
-  const { utc } = useMET();
+  const { utc } = useMet();
 
   useEffect(() => {
     const onIn  = () => setIsZoomed(true);

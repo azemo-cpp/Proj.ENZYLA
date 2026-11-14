@@ -1,8 +1,8 @@
-import { useISS } from '../hooks/useISS';
+import { useIss } from '../hooks/useIss';
 
 // ISS telemetry, bottom-left only. Dim monospace, unobtrusive.
 export default function HUD() {
-  const iss = useISS();
+  const iss = useIss();
 
   return (
     <div className="hud-mono" style={{ position: 'fixed', bottom: 72, left: 24, pointerEvents: 'none' }}>

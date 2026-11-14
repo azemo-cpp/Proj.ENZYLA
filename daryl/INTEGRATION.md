@@ -1,7 +1,7 @@
 # Daryl inside Project Enzyla
 
-Daryl lives in this `daryl/` folder. The chat box (bottom-right) is `src/components/DarylChat.tsx`,
-shown from `src/App.tsx`.
+Daryl lives in this `daryl/` folder. The chat box (bottom-right) is `src/components/darylChat.tsx`,
+shown from `src/app.tsx`.
 
 ## Run it
 
@@ -34,7 +34,7 @@ press Ctrl+C. If the app is closed in any other way, Daryl stops by himself too.
 ## Known differences
 
 - The numbers Daryl calculates come from his own simplified Sun and Earth model. The numbers in the
-  Site Conditions panel (`SiteTimeline.tsx`) are typed in by hand, so the two will not match.
+  Site Conditions panel (`siteTimeline.tsx`) are typed in by hand, so the two will not match.
 - Daryl answers about the next 14 days from today, while the panel describes conditions at each landing.
 
 ---
