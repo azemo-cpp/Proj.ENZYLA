@@ -1,35 +1,16 @@
 {
-  "name": "negaton-space",
-  "private": true,
-  "version": "0.0.0",
+  "name": "daryl",
+  "version": "2.0.0",
+  "description": "Daryl: a lunar mission assistant with a self-diagnosing safety system around it",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview"
+    "test": "node --test",
+    "start": "node server.js",
+    "daryl": "node daryl.js",
+    "doctor": "node doctor.js",
+    "sandbox": "node sandbox.js"
   },
-  "devDependencies": {
-    "@tailwindcss/postcss": "^4.3.3",
-    "@types/react": "^19.3.0",
-    "@types/react-dom": "^19.3.0",
-    "@types/three": "^0.186.0",
-    "@vitejs/plugin-react": "^6.1.2",
-    "autoprefixer": "^10.6.1",
-    "postcss": "^8.5.31",
-    "tailwindcss": "^4.3.3",
-    "typescript": "~6.0.2",
-    "vite": "^8.3.0"
-  },
-  "dependencies": {
-    "@gsap/react": "^2.1.2",
-    "clsx": "^2.1.1",
-    "gsap": "^3.15.0",
-    "lucide-react": "^1.60.0",
-    "postprocessing": "^6.39.5",
-    "react": "^19.3.1",
-    "react-dom": "^19.3.1",
-    "react-icons": "^5.7.0",
-    "three": "^0.186.1"
+  "engines": {
+    "node": ">=18"
   }
 }
-
