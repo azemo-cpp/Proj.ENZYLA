@@ -503,13 +503,17 @@ Dito mo i-edit ang engine, ito na ang source. */
           out +=
             "\n\nFrom your current dates and mission length, these sites have the most sunlight:\n\n" +
             tbl(
-              ["Site", "Sunlit", "Longest darkness", "Energy to bridge it per 100 W load"],
-              rows.map((r) => [
-                r.name,
-                pct(r.st.sun),
-                hr(r.st.maxD),
-                Math.round(r.st.maxD * 100).toLocaleString("en-US") + " Wh",
-              ]),
+              ["Site", "Sunlit", "Longest darkness", "Energy to bridge it per 100 W load", ...(ctx.thermal ? ["Night low", "Day high"] : [])],
+              rows.map((r, i) => {
+                const th = ctx.thermal ? ctx.thermal(list.find((s) => s[0] === r.name)) : null;
+                return [
+                  r.name,
+                  pct(r.st.sun),
+                  hr(r.st.maxD),
+                  Math.round(r.st.maxD * 100).toLocaleString("en-US") + " Wh",
+                  ...(ctx.thermal ? [th ? Math.round(th.minK - 273.15) + " C" : "n/a", th ? Math.round(th.maxK - 273.15) + " C" : "n/a"] : []),
+                ];
+              }),
             ) +
             "\n\nSunlit share\n" +
             rows.map((r) => "  " + r.name.slice(0, 24).padEnd(24) + "  " + bar(r.st.sun) + "  " + pct(r.st.sun)).join("\n");
@@ -517,6 +521,47 @@ Dito mo i-edit ang engine, ito na ang source. */
         out +=
           "\n\nIn plain terms: a panel makes power in proportion to how directly the Sun hits it, so a low polar Sun needs vertical panels, while an equatorial site gets strong power only during the day. The battery you need is roughly your load in watts times the longest dark spell in hours. The last column assumes a 100 W load as an example. These are screening numbers, not a design.";
         return out;
+      },
+    },
+    {
+      k: [
+        "temperature",
+        "temperatures",
+        "how hot",
+        "how cold",
+        "hot and cold",
+        "hottest",
+        "coldest",
+        "surface temperature",
+        "thermal data",
+        "diviner",
+        "kelvin",
+        "celsius",
+        "freezing",
+        "heat data",
+      ],
+      a: (ctx) => {
+        const c = (k) => Math.round(k - 273.15);
+        const list = (ctx && ctx.SITES && ctx.thermal ? ctx.SITES : [])
+          .map((s) => ({ name: s[0], t: ctx.thermal(s) }))
+          .filter((r) => r.t);
+        if (!list.length)
+          return "On the Moon the surface swings from roughly 390 K (about 120 C) at midday near the equator to about 95 K (about -180 C) at night, and polar shadowed craters can stay below 50 K. I do not have per-site temperature data loaded, so I cannot give figures for a specific site.";
+        const rows = list.slice(0, 12);
+        return (
+          "Surface temperature is the other half of a power plan, because a lander must survive both the heat of day and the cold of night. These figures come from the Diviner radiometer on the Lunar Reconnaissance Orbiter (2009-2015 data, 0.5 degree map cells).\n\n" +
+          tbl(
+            ["Site", "Hottest (day)", "Coldest (night)", "Swing"],
+            rows.map((r) => [
+              r.name,
+              r.t.maxK.toFixed(0) + " K (" + c(r.t.maxK) + " C)",
+              r.t.minK.toFixed(0) + " K (" + c(r.t.minK) + " C)",
+              Math.round(r.t.maxK - r.t.minK) + " K",
+            ]),
+          ) +
+          (list.length > rows.length ? "\n\n...and " + (list.length - rows.length) + " more sites. Ask about one by name for its row." : "") +
+          "\n\nIn plain terms: near the equator the ground gets hotter than boiling water at noon and drops to about -180 C at night, so a lander needs heaters or a radioisotope source to survive the roughly two-week night. Higher latitudes are cooler in the day (around 300 to 360 K). These are averages for a 0.5 degree cell (about 15 km), so they do not show shadowed craters or ridges at the poles."
+        );
       },
     },
   ];
@@ -574,7 +619,11 @@ Dito mo i-edit ang engine, ito na ang source. */
     const intro = s[3]
       ? s[0] + ": " + s[3] + " It is at " + where + "."
       : s[0] + " is a site in your data, at " + where + ".";
-    return intro + "\n\nIn your current window: " + line(evalSite(ctx, s, ctx.N));
+    const th = ctx.thermal ? ctx.thermal(s) : null;
+    const temp = th
+      ? "\n\nSurface temperature (Diviner): about " + Math.round(th.maxK - 273.15) + " C at the hottest and " + Math.round(th.minK - 273.15) + " C at the coldest."
+      : "";
+    return intro + "\n\nIn your current window: " + line(evalSite(ctx, s, ctx.N)) + temp;
   }
 
   /* ---------- Understanding the question ---------- */
@@ -1167,9 +1216,9 @@ function answer(q, ctx) {
      WEAK: karaniwang salita (power, earth, sun...), kailangan ng dalawa, kasi "power of fuel" ay hindi tungkol sa buwan.
      PHRASE: mga tanong sa page mismo ("explain this simply", "what does the red mean").
      Dagdag pa: pangalan ng site, petsa, o malakas na tugma sa knowledge base. */
-  const STRONG = /\b(moon|lunar|landing|lander|mission|horizon|heatmap|elevation|azimuth|sunlit|sunlight|briefing|glossary|planner|libration|dte|apollo|crater|daryl|south pole|landing sites?|sites?|surveyors?|rangers?|lunokhods?|rovers?|grail|ladee|lroc|diviner|s-?ivb)\b/i;
-  const WEAK = /\b(power|solar|battery|thermal|sun|earth|dark|darkness|outage|comms?|radio|antenna|relay|risks?|compare|score|window|dates?|colou?rs?|table|summary|survive|survival|temperatures?|hot|hottest|cold|coldest|heat|impacts?|luna|flip ?book|traverse)\b/gi;
-  const PHRASE = /\b(this page|the page|this chart|the chart|this tool|this planner|explain (this|it) simply|how accurate|what does the (red|green|amber|yellow|blue)|the (red|green|amber)\b|the (summary )?cards?|step [123]|the pole|power (potential|budget)|solar (potential|panels?)|dark at|how much (sun|light)|how long .{0,20}(dark|lit|sun))\b/i;
+  const STRONG = /\b(moon|lunar|landing|lander|horizon|heatmap|elevation|azimuth|sunlit|sunlight|briefing|glossary|planner|libration|dte|apollo|crater|daryl|south pole|landing sites?|surveyors?|rangers?|lunokhods?|rovers?|grail|ladee|lroc|diviner|s-?ivb|blue ghost|chang'?e|luna \d+)\b/i;
+  const WEAK = /\b(power|solar|battery|thermal|sun|earth|dark|darkness|outage|comms?|radio|antenna|relay|risks?|compare|score|window|dates?|colou?rs?|table|summary|survive|survival|temperatures?|hot|hottest|cold|coldest|heat|impacts?|luna|flip ?book|traverse|mission|sites?|terrain|mask|verdict|badge|rating|weights?|altitude|overlap|simultaneous|continuous|consecutive)\b/gi;
+  const PHRASE = /\b(this page|the page|this chart|the chart|this tool|this planner|explain (this|it) simply|how accurate|what does the (red|green|amber|yellow|blue)|the (red|green|amber)\b|the (summary )?cards?|steps? [1-6]|the pole|how (hot|cold)|surface temperatures?|power (potential|budget)|solar (potential|panels?)|dark at|how much (sun|light|earth)|how long .{0,30}(dark|lit|sun|outage)|horizon mask|terrain blocking|planner score|mission briefing|show me a table|glossary of terms|what are the (power|comms?|communication) risks)\b/i;
 
   function relatedness(q, ctx) {
     const lower = String(q).toLowerCase();
