@@ -18,10 +18,10 @@ interface DarylSite { index: number; name: string; }
 type Block = { kind: 'text'; text: string } | { kind: 'table'; rows: string[][] } | { kind: 'chart'; text: string };
 
 const IS_DEV = Boolean((import.meta as any).env?.DEV);
-const DEFAULT_API = ''; // Dev: nasa loob na ng Vite si Daryl (same origin). Para sa hiwalay na server, i-set ang VITE_DARYL_API.
+const DEFAULT_API = '';
 const OFFLINE =
   "Can't reach Daryl right now." +
-  (IS_DEV ? ' Daryl runs inside the dev server. Restart npm run dev and check the terminal for a [daryl] error.' : '');
+  (IS_DEV ? ' Is the Daryl server running? Start it with: npm start (in the Daryl folder)' : '');
 const GREETING = "Hi, I'm Daryl. Ask me to compare landing sites or find the best landing date.";
 const FONT_SMALL = { fontSize: 8, letterSpacing: '0.2em', textTransform: 'uppercase' as const };
 
