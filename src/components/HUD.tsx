@@ -1,4 +1,4 @@
-import { useIss } from '../hooks/useIss';
+import { useIss } from '../hooks/useISS';
 
 // ISS telemetry, bottom-left only. Dim monospace, unobtrusive.
 export default function HUD() {
