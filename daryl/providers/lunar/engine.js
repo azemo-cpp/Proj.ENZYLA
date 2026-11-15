@@ -482,44 +482,44 @@ Dito mo i-edit ang engine, ito na ang source. */
         "power data",
       ],
       a: (ctx) => {
-        const bar = (v) => "█".repeat(Math.round(v * 12)) + "░".repeat(12 - Math.round(v * 12));
+        const bar = (v) => "█".repeat(Math.round(v * 10)) + "░".repeat(10 - Math.round(v * 10));
+        const nm = (n) => (n.length > 16 ? n.slice(0, 15) + "…" : n).padEnd(16);
+        const C = (k) => Math.round(k - 273.15);
         let out =
-          "Power potential on the Moon comes down to two things: how often the Sun is above the horizon, and how long the dark gaps last. Sunlight at the Moon is about 1361 watts per square metre, the same as at Earth, so the difference between sites is timing and angle, not strength.\n\n" +
+          "Power on the Moon depends on how often the Sun is up and how long the dark gaps last. Sunlight is about 1361 W/m², the same as at Earth, so sites differ by timing and angle, not strength.\n\n" +
           tbl(
-            ["Site type", "Sunlit share", "Longest dark spell", "Panel layout", "Typical power plan"],
+            ["Site type", "Sunlit", "Power plan"],
             [
-              ["Equator / near side", "about 50%", "about 14 days", "Flat, Sun overhead at noon", "Big battery, RTG or heater for the night"],
-              ["Mid latitude", "about 50%", "about 14 days", "Tilted toward the Sun", "Same as equator, lower noon power"],
-              ["Polar ridge or rim", "high, varies by spot", "hours to a few days", "Vertical masts, Sun near the horizon", "Solar plus a small battery"],
-              ["Polar crater floor", "about 0%", "permanent", "None", "Beamed power, cable, or nuclear"],
+              ["Equator / mid latitude", "~50%", "14-day night: big battery, RTG or heater"],
+              ["Polar ridge or rim", "high, varies", "Vertical masts plus a small battery"],
+              ["Polar crater floor", "~0%", "Beamed power, cable or nuclear"],
             ],
           );
         const list = (ctx && ctx.SITES ? ctx.SITES : []).slice(0, 12);
         if (list.length) {
           const rows = list
-            .map((s) => evalSite(ctx, s, ctx.N))
-            .sort((a, b) => b.st.sun - a.st.sun)
-            .slice(0, 5);
+            .map((s) => ({ s, r: evalSite(ctx, s, ctx.N) }))
+            .sort((a, b) => b.r.st.sun - a.r.st.sun)
+            .slice(0, 4);
           out +=
-            "\n\nFrom your current dates and mission length, these sites have the most sunlight:\n\n" +
+            "\n\nSunniest sites for your dates:\n\n" +
             tbl(
-              ["Site", "Sunlit", "Longest darkness", "Energy to bridge it per 100 W load", ...(ctx.thermal ? ["Night low", "Day high"] : [])],
-              rows.map((r, i) => {
-                const th = ctx.thermal ? ctx.thermal(list.find((s) => s[0] === r.name)) : null;
+              ["Site", "Sunlit", "Longest dark", ...(ctx.thermal ? ["Low / high"] : [])],
+              rows.map(({ s, r }) => {
+                const th = ctx.thermal ? ctx.thermal(s) : null;
                 return [
                   r.name,
                   pct(r.st.sun),
                   hr(r.st.maxD),
-                  Math.round(r.st.maxD * 100).toLocaleString("en-US") + " Wh",
-                  ...(ctx.thermal ? [th ? Math.round(th.minK - 273.15) + " C" : "n/a", th ? Math.round(th.maxK - 273.15) + " C" : "n/a"] : []),
+                  ...(ctx.thermal ? [th ? C(th.minK) + " / " + C(th.maxK) + " C" : "n/a"] : []),
                 ];
               }),
             ) +
-            "\n\nSunlit share\n" +
-            rows.map((r) => "  " + r.name.slice(0, 24).padEnd(24) + "  " + bar(r.st.sun) + "  " + pct(r.st.sun)).join("\n");
+            "\n\n" +
+            rows.map(({ r }) => nm(r.name) + " " + bar(r.st.sun) + " " + pct(r.st.sun)).join("\n");
         }
         out +=
-          "\n\nIn plain terms: a panel makes power in proportion to how directly the Sun hits it, so a low polar Sun needs vertical panels, while an equatorial site gets strong power only during the day. The battery you need is roughly your load in watts times the longest dark spell in hours. The last column assumes a 100 W load as an example. These are screening numbers, not a design.";
+          "\n\nBattery rule of thumb: load in watts × longest dark hours. These are screening numbers, not a design.";
         return out;
       },
     },
@@ -547,20 +547,15 @@ Dito mo i-edit ang engine, ito na ang source. */
           .filter((r) => r.t);
         if (!list.length)
           return "On the Moon the surface swings from roughly 390 K (about 120 C) at midday near the equator to about 95 K (about -180 C) at night, and polar shadowed craters can stay below 50 K. I do not have per-site temperature data loaded, so I cannot give figures for a specific site.";
-        const rows = list.slice(0, 12);
+        const rows = list.slice(0, 6);
         return (
-          "Surface temperature is the other half of a power plan, because a lander must survive both the heat of day and the cold of night. These figures come from the Diviner radiometer on the Lunar Reconnaissance Orbiter (2009-2015 data, 0.5 degree map cells).\n\n" +
+          "Surface temperature, from the Diviner radiometer on the Lunar Reconnaissance Orbiter (2009-2015, 0.5 degree cells).\n\n" +
           tbl(
-            ["Site", "Hottest (day)", "Coldest (night)", "Swing"],
-            rows.map((r) => [
-              r.name,
-              r.t.maxK.toFixed(0) + " K (" + c(r.t.maxK) + " C)",
-              r.t.minK.toFixed(0) + " K (" + c(r.t.minK) + " C)",
-              Math.round(r.t.maxK - r.t.minK) + " K",
-            ]),
+            ["Site", "Day high", "Night low"],
+            rows.map((r) => [r.name, c(r.t.maxK) + " C", c(r.t.minK) + " C"]),
           ) +
-          (list.length > rows.length ? "\n\n...and " + (list.length - rows.length) + " more sites. Ask about one by name for its row." : "") +
-          "\n\nIn plain terms: near the equator the ground gets hotter than boiling water at noon and drops to about -180 C at night, so a lander needs heaters or a radioisotope source to survive the roughly two-week night. Higher latitudes are cooler in the day (around 300 to 360 K). These are averages for a 0.5 degree cell (about 15 km), so they do not show shadowed craters or ridges at the poles."
+          (list.length > rows.length ? "\n\nAsk about any other site by name for its row." : "") +
+          "\n\nNear the equator noon is hotter than boiling water and night falls to about -180 C, so a lander needs heaters or a radioisotope source for the two-week night. Cells are about 15 km wide, so polar shadowed craters are not resolved."
         );
       },
     },
