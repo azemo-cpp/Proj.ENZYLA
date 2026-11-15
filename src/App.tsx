@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import Navbar from './components/navbar';
-import HUD from './components/hud';
-import MoonExplorer from './components/moonExplorer';
-import SiteTimeline from './components/siteTimeline';
-import DarylChat from './components/darylChat';
+import Navbar from './components/Navbar';
+import HUD from './components/HUD';
+import MoonExplorer from './components/MoonExplorer';
+import SiteTimeline from './components/SiteTimeline';
+import DarylChat from './components/DarylChat';
 
 interface MoonClickDetail { name: string; lat: number; lon: number; type: string; }
 
