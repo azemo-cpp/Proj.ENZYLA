@@ -6,6 +6,16 @@ const R = Math.PI / 180;
 import { SITES } from "../../database/sites.js";
 export { SITES };
 
+// Diviner temperature lookup (database/site-thermal.json). Optional: kung wala ang file, walang thermal na sagot.
+import fs from "node:fs";
+let THERMAL = {};
+try {
+  THERMAL = JSON.parse(fs.readFileSync(new URL("../../database/site-thermal.json", import.meta.url), "utf8")).sites || {};
+} catch {
+  THERMAL = {};
+}
+const thermal = s => THERMAL[s[0]] || null;
+
 const T0 = 2451550.26;
 const SYN = 29.530589;
 const HORIZON = 140 * 24;
@@ -69,7 +79,7 @@ export function makeContext({
 } = {}) {
   const clean = Number.isFinite(startMs) ? startMs : Date.now();
   return {
-    SITES, site, series, stats,
+    SITES, site, series, stats, thermal,
     d: clean,
     N: Math.min(60, Math.max(2, Number(days) || 14)) * 24,
     mask: Number(mask) || 0,
