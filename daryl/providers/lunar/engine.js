@@ -464,6 +464,61 @@ Dito mo i-edit ang engine, ito na ang source. */
           ],
         ),
     },
+    {
+      k: [
+        "power potential",
+        "solar potential",
+        "power budget",
+        "how much power",
+        "power available",
+        "energy potential",
+        "solar energy",
+        "solar power",
+        "solar panel",
+        "solar panels",
+        "battery size",
+        "how big a battery",
+        "rtg",
+        "power data",
+      ],
+      a: (ctx) => {
+        const bar = (v) => "█".repeat(Math.round(v * 12)) + "░".repeat(12 - Math.round(v * 12));
+        let out =
+          "Power potential on the Moon comes down to two things: how often the Sun is above the horizon, and how long the dark gaps last. Sunlight at the Moon is about 1361 watts per square metre, the same as at Earth, so the difference between sites is timing and angle, not strength.\n\n" +
+          tbl(
+            ["Site type", "Sunlit share", "Longest dark spell", "Panel layout", "Typical power plan"],
+            [
+              ["Equator / near side", "about 50%", "about 14 days", "Flat, Sun overhead at noon", "Big battery, RTG or heater for the night"],
+              ["Mid latitude", "about 50%", "about 14 days", "Tilted toward the Sun", "Same as equator, lower noon power"],
+              ["Polar ridge or rim", "high, varies by spot", "hours to a few days", "Vertical masts, Sun near the horizon", "Solar plus a small battery"],
+              ["Polar crater floor", "about 0%", "permanent", "None", "Beamed power, cable, or nuclear"],
+            ],
+          );
+        const list = (ctx && ctx.SITES ? ctx.SITES : []).slice(0, 12);
+        if (list.length) {
+          const rows = list
+            .map((s) => evalSite(ctx, s, ctx.N))
+            .sort((a, b) => b.st.sun - a.st.sun)
+            .slice(0, 5);
+          out +=
+            "\n\nFrom your current dates and mission length, these sites have the most sunlight:\n\n" +
+            tbl(
+              ["Site", "Sunlit", "Longest darkness", "Energy to bridge it per 100 W load"],
+              rows.map((r) => [
+                r.name,
+                pct(r.st.sun),
+                hr(r.st.maxD),
+                Math.round(r.st.maxD * 100).toLocaleString("en-US") + " Wh",
+              ]),
+            ) +
+            "\n\nSunlit share\n" +
+            rows.map((r) => "  " + r.name.slice(0, 24).padEnd(24) + "  " + bar(r.st.sun) + "  " + pct(r.st.sun)).join("\n");
+        }
+        out +=
+          "\n\nIn plain terms: a panel makes power in proportion to how directly the Sun hits it, so a low polar Sun needs vertical panels, while an equatorial site gets strong power only during the day. The battery you need is roughly your load in watts times the longest dark spell in hours. The last column assumes a 100 W load as an example. These are screening numbers, not a design.";
+        return out;
+      },
+    },
   ];
   const DEF = [
     "what does",
@@ -1114,7 +1169,7 @@ function answer(q, ctx) {
      Dagdag pa: pangalan ng site, petsa, o malakas na tugma sa knowledge base. */
   const STRONG = /\b(moon|lunar|landing|lander|mission|horizon|heatmap|elevation|azimuth|sunlit|sunlight|briefing|glossary|planner|libration|dte|apollo|crater|daryl|south pole|landing sites?|sites?|surveyors?|rangers?|lunokhods?|rovers?|grail|ladee|lroc|diviner|s-?ivb)\b/i;
   const WEAK = /\b(power|solar|battery|thermal|sun|earth|dark|darkness|outage|comms?|radio|antenna|relay|risks?|compare|score|window|dates?|colou?rs?|table|summary|survive|survival|temperatures?|hot|hottest|cold|coldest|heat|impacts?|luna|flip ?book|traverse)\b/gi;
-  const PHRASE = /\b(this page|the page|this chart|the chart|this tool|this planner|explain (this|it) simply|how accurate|what does the (red|green|amber|yellow|blue)|the (red|green|amber)\b|the (summary )?cards?|step [123]|the pole|dark at|how much (sun|light)|how long .{0,20}(dark|lit|sun))\b/i;
+  const PHRASE = /\b(this page|the page|this chart|the chart|this tool|this planner|explain (this|it) simply|how accurate|what does the (red|green|amber|yellow|blue)|the (red|green|amber)\b|the (summary )?cards?|step [123]|the pole|power (potential|budget)|solar (potential|panels?)|dark at|how much (sun|light)|how long .{0,20}(dark|lit|sun))\b/i;
 
   function relatedness(q, ctx) {
     const lower = String(q).toLowerCase();
