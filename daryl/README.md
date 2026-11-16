@@ -17,7 +17,7 @@ From the main project folder (not this folder):
 
 On Windows use `npm.cmd` instead of `npm`. Needs Node.js 18 or newer.
 
-## Add AI chat (optional)
+## Ollama
 
 By default Daryl answers lunar questions on his own. If you connect a local AI model through Ollama, he can
 also handle anything else — jokes, general questions, follow-ups. If Ollama isn't installed or something goes
