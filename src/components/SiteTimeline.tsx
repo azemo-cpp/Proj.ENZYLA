@@ -2,7 +2,7 @@ import {
   Sun, Globe, Radio, Moon, Thermometer,
   MapPin, Clock, Compass,
 } from 'lucide-react';
-import { APOLLO_SITES } from '../data/apolloSites';
+import type { SiteLocation } from '../data/apolloSites';
 
 const MISSION_DATA: Record<string, {
   sunElevation: string;
@@ -14,20 +14,26 @@ const MISSION_DATA: Record<string, {
   lunarDayPhase: string;
   surfaceTemp: string;
 }> = {
-  'Apollo 11': { sunElevation:'6–12°', earthVisible:'Yes (near side)', sunEarthTogether:'Yes', longestDark:'354 hrs', longestCommOutage:'48 min/orbit', meanSunElev:'9.0°', lunarDayPhase:'Early morning', surfaceTemp:'−178 to +122 °C' },
-  'Apollo 12': { sunElevation:'5–11°', earthVisible:'Yes (near side)', sunEarthTogether:'Yes', longestDark:'354 hrs', longestCommOutage:'47 min/orbit', meanSunElev:'8.1°', lunarDayPhase:'Early morning', surfaceTemp:'−178 to +122 °C' },
-  'Apollo 14': { sunElevation:'13–19°', earthVisible:'Yes (near side)', sunEarthTogether:'Yes', longestDark:'354 hrs', longestCommOutage:'49 min/orbit', meanSunElev:'15.0°', lunarDayPhase:'Lunar morning', surfaceTemp:'−179 to +120 °C' },
-  'Apollo 15': { sunElevation:'21–27°', earthVisible:'Yes (near side)', sunEarthTogether:'Yes', longestDark:'354 hrs', longestCommOutage:'46 min/orbit', meanSunElev:'24.0°', lunarDayPhase:'Near local noon', surfaceTemp:'−179 to +109 °C' },
-  'Apollo 16': { sunElevation:'7–14°', earthVisible:'Yes (near side)', sunEarthTogether:'Yes', longestDark:'354 hrs', longestCommOutage:'45 min/orbit', meanSunElev:'10.5°', lunarDayPhase:'Early morning', surfaceTemp:'−180 to +113 °C' },
-  'Apollo 17': { sunElevation:'14–20°', earthVisible:'Yes (near side)', sunEarthTogether:'Yes', longestDark:'354 hrs', longestCommOutage:'50 min/orbit', meanSunElev:'16.5°', lunarDayPhase:'Lunar morning', surfaceTemp:'−177 to +112 °C' },
+  'Apollo 11': { sunElevation:'6–12°', earthVisible:'Yes (near side)', sunEarthTogether:'Yes', longestDark:'354 hrs', longestCommOutage:'48 min/orbit', meanSunElev:'9.0°', lunarDayPhase:'Early morning', surfaceTemp:'−20 to +120 °C' },
+  'Apollo 12': { sunElevation:'5–11°', earthVisible:'Yes (near side)', sunEarthTogether:'Yes', longestDark:'354 hrs', longestCommOutage:'47 min/orbit', meanSunElev:'8.1°', lunarDayPhase:'Early morning', surfaceTemp:'−30 to +110 °C' },
+  'Apollo 14': { sunElevation:'13–19°', earthVisible:'Yes (near side)', sunEarthTogether:'Yes', longestDark:'354 hrs', longestCommOutage:'49 min/orbit', meanSunElev:'15.0°', lunarDayPhase:'Lunar morning', surfaceTemp:'−20 to +130 °C' },
+  'Apollo 15': { sunElevation:'21–27°', earthVisible:'Yes (near side)', sunEarthTogether:'Yes', longestDark:'354 hrs', longestCommOutage:'46 min/orbit', meanSunElev:'24.0°', lunarDayPhase:'Near local noon', surfaceTemp:'+10 to +150 °C' },
+  'Apollo 16': { sunElevation:'7–14°', earthVisible:'Yes (near side)', sunEarthTogether:'Yes', longestDark:'354 hrs', longestCommOutage:'45 min/orbit', meanSunElev:'10.5°', lunarDayPhase:'Early morning', surfaceTemp:'−30 to +125 °C' },
+  'Apollo 17': { sunElevation:'14–20°', earthVisible:'Yes (near side)', sunEarthTogether:'Yes', longestDark:'354 hrs', longestCommOutage:'50 min/orbit', meanSunElev:'16.5°', lunarDayPhase:'Lunar morning', surfaceTemp:'−20 to +135 °C' },
 };
 
-interface Props { activeSite: string; onSelect: (name: string, lat: number, lon: number) => void; }
+interface Props {
+  activeSite: string;
+  sites: SiteLocation[];
+  showDashboard: boolean;
+  onSelect: (name: string, lat: number, lon: number) => void;
+  onManage: () => void;
+}
 
 const iconSize = 13;
 const iconColor = 'rgba(255,255,255,0.5)';
 
-export default function SiteTimeline({ activeSite, onSelect }: Props) {
+export default function SiteTimeline({ activeSite, sites, showDashboard, onSelect, onManage }: Props) {
   const d = MISSION_DATA[activeSite];
 
   const metrics = d ? [
@@ -44,8 +50,8 @@ export default function SiteTimeline({ activeSite, onSelect }: Props) {
   return (
     <>
       {/* ── Site conditions dashboard — top right ── */}
-      {d && (
-        <div style={{
+      {d && showDashboard && (
+        <div className="site-conditions-panel" style={{
           position: 'fixed', top: 64, right: 20,
           width: 270, zIndex: 20, pointerEvents: 'auto',
           background: 'rgba(0,0,0,0.85)',
@@ -59,7 +65,7 @@ export default function SiteTimeline({ activeSite, onSelect }: Props) {
           }}>
             <MapPin size={12} color="rgba(255,255,255,0.5)" />
             <div>
-              <div style={{ fontSize: 8, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', lineHeight: 1 }}>
+              <div style={{ fontSize: 10, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)', lineHeight: 1.2 }}>
                 Site Conditions
               </div>
               <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#fff', marginTop: 2 }}>
@@ -73,17 +79,17 @@ export default function SiteTimeline({ activeSite, onSelect }: Props) {
             {metrics.map(({ Icon, label, value }) => (
               <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
                 <Icon size={iconSize} color={iconColor} style={{ flexShrink: 0 }} />
-                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', flex: 1, letterSpacing: '0.04em' }}>
+                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', flex: 1, letterSpacing: '0.04em' }}>
                   {label}
                 </span>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
                   {value}
                 </span>
               </div>
             ))}
           </div>
 
-          <div style={{ padding: '6px 16px 8px', borderTop: '1px solid rgba(255,255,255,0.06)', fontSize: 8, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.18)' }}>
+          <div style={{ padding: '6px 16px 8px', borderTop: '1px solid rgba(255,255,255,0.06)', fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)' }}>
             NASA Apollo Mission Planning Data
           </div>
         </div>
@@ -91,7 +97,7 @@ export default function SiteTimeline({ activeSite, onSelect }: Props) {
 
       {/* ── Bottom timeline strip ── */}
       <div className="timeline-strip" style={{ pointerEvents: 'auto' }}>
-        {APOLLO_SITES.map((s, i) => (
+        {sites.map((s, i) => (
           <div key={s.id} style={{ display: 'flex', alignItems: 'center' }}>
             {i > 0 && <span className="timeline-sep" aria-hidden>|</span>}
             <button
@@ -104,6 +110,10 @@ export default function SiteTimeline({ activeSite, onSelect }: Props) {
             </button>
           </div>
         ))}
+        {sites.length > 0 && <span className="timeline-sep" aria-hidden>|</span>}
+        <button type="button" className="timeline-item" onClick={onManage}>
+          Manage sites
+        </button>
       </div>
     </>
   );

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, SyntheticEvent } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 
-// Daryl, the lunar mission assistant. A small box docked at the bottom-right: click its header to open or close it.
+// Daryl, the lunar mission assistant. A small box docked at the bottom-left: click its header to open or close it.
 // Hiwalay na server ang Daryl (sarili niyang repo). Kailangan itong tumatakbo: npm start sa Daryl folder.
 // Dev: http://localhost:8787 ang default. Production: i-set ang VITE_DARYL_API (o ipasa ang api prop).
 
@@ -15,29 +15,25 @@ interface Props {
 
 interface Message { id: number; role: 'user' | 'daryl'; text: string; error?: boolean; }
 interface DarylSite { index: number; name: string; }
-type Block = { kind: 'text'; text: string } | { kind: 'table'; rows: string[][] } | { kind: 'chart'; text: string };
+type Block =
+  | { kind: 'text'; text: string }
+  | { kind: 'table'; rows: string[][] }
+  | { kind: 'chart'; spec: any };
 
-const IS_DEV = Boolean((import.meta as any).env?.DEV);
 const DEFAULT_API = '';
-const OFFLINE =
-  "Can't reach Daryl right now." +
-  (IS_DEV ? ' Is the Daryl server running? Start it with: npm start (in the Daryl folder)' : '');
+const OFFLINE = "Can't reach Daryl right now. Please try again in a moment.";
 const GREETING = "Hi, I'm Daryl. Ask me to compare landing sites or find the best landing date.";
-const FONT_SMALL = { fontSize: 8, letterSpacing: '0.2em', textTransform: 'uppercase' as const };
+const FONT_SMALL = { fontSize: 10, letterSpacing: '0.2em', textTransform: 'uppercase' as const };
 
-// "| a | b |" lines become a table, the rest stays plain text.
-// Everything is rendered as text by React, so nothing in an answer can inject HTML.
+// Answers can contain three things: plain text, markdown pipe tables
+// (| a | b |), and fenced ```chart blocks carrying a small bar-chart spec.
+// Everything is rendered from data by React, so nothing in an answer can inject HTML.
 function parseAnswer(text: string): Block[] {
   const blocks: Block[] = [];
+  const lines = text.split('\n');
   let textLines: string[] = [];
   let tableLines: string[] = [];
-  let chartLines: string[] = [];
 
-  const flushChart = () => {
-    if (!chartLines.length) return;
-    blocks.push({ kind: 'chart', text: chartLines.join('\n') });
-    chartLines = [];
-  };
   const flushText = () => {
     const joined = textLines.join('\n').replace(/^\n+|\n+$/g, '');
     if (joined) blocks.push({ kind: 'text', text: joined });
@@ -52,29 +48,100 @@ function parseAnswer(text: string): Block[] {
     tableLines = [];
   };
 
-  for (const line of text.split('\n')) {
-    if (/^\s*\|.*\|\s*$/.test(line)) { flushText(); flushChart(); tableLines.push(line); }
-    else if (/[█░]/.test(line)) { flushText(); flushTable(); chartLines.push(line); } // bar-chart line
-    else { flushTable(); flushChart(); textLines.push(line); }
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (line.trim().startsWith('```chart')) {
+      flushText();
+      flushTable();
+      const buf: string[] = [];
+      i++;
+      while (i < lines.length && !lines[i].trim().startsWith('```')) { buf.push(lines[i]); i++; }
+      i++; // closing fence (or end of text)
+      try {
+        const spec = JSON.parse(buf.join('\n'));
+        if (spec && spec.type === 'bar') blocks.push({ kind: 'chart', spec });
+      } catch { /* ignore a malformed chart block */ }
+      continue;
+    }
+    if (/^\s*\|.*\|\s*$/.test(line)) { flushText(); tableLines.push(line); }
+    else { flushTable(); textLines.push(line); }
+    i++;
   }
   flushText();
   flushTable();
-  flushChart();
   return blocks;
+}
+
+const CHART_COLORS = ['#ffd166', '#4cc9f0', '#b5e48c', '#f4a261', '#ef6f6c'];
+function Chart({ spec }: { spec: any }) {
+  const labels: string[] = Array.isArray(spec?.labels) ? spec.labels : [];
+  const series: { name: string; values: number[]; unit?: string }[] = Array.isArray(spec?.series) ? spec.series : [];
+  if (!labels.length || !series.length) return null;
+  const flat = series.flatMap((s: any) => (Array.isArray(s?.values) ? s.values : []));
+  const max = typeof spec?.max === 'number' && spec.max > 0 ? spec.max : Math.max(100, ...flat, 1);
+  const W = 280, H = 132, padL = 6, padR = 6, padT = 14, padB = 22;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+  const groupW = plotW / Math.max(labels.length, 1);
+  const seriesCount = series.length;
+  const barGap = 1;
+  const barW = Math.max(3, Math.min(20, (groupW * 0.82) / seriesCount - barGap));
+  return (
+    <div style={{ margin: '8px 0' }}>
+      {spec?.title ? (
+        <div style={{ fontSize: 10, opacity: 0.65, marginBottom: 3, letterSpacing: '0.04em' }}>{String(spec.title)}</div>
+      ) : null}
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block' }}>
+        {[0, 0.5, 1].map(f => {
+          const y = padT + plotH * (1 - f);
+          return <line key={f} x1={padL} y1={y} x2={W - padR} y2={y} stroke="rgba(255,255,255,0.10)" strokeWidth={1} />;
+        })}
+        {labels.map((lab, gi) => {
+          const center = padL + groupW * gi + groupW / 2;
+          const start = center - (barW * seriesCount + barGap * (seriesCount - 1)) / 2;
+          return (
+            <g key={gi}>
+              {series.map((s, si) => {
+                const v = Math.max(0, Number(s.values?.[gi]) || 0);
+                const h = (v / max) * plotH;
+                const x = start + si * (barW + barGap);
+                const y = padT + plotH - h;
+                return (
+                  <rect key={si} x={x} y={y} width={barW} height={h} fill={CHART_COLORS[si % CHART_COLORS.length]} rx={1}>
+                    <title>{`${lab} · ${s.name}: ${v}${s.unit ?? ''}`}</title>
+                  </rect>
+                );
+              })}
+              <text x={center} y={H - 8} fontSize={9} fill="rgba(255,255,255,0.7)" textAnchor="middle">
+                {lab.length > 11 ? lab.slice(0, 10) + '…' : lab}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 8px', fontSize: 10, marginTop: 2 }}>
+        {series.map((s, si) => (
+          <span key={si} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, opacity: 0.8 }}>
+            <span style={{ width: 7, height: 7, background: CHART_COLORS[si % CHART_COLORS.length], display: 'inline-block', borderRadius: 1 }} />
+            {String(s.name)}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function Answer({ text }: { text: string }) {
   return (
     <>
-      {parseAnswer(text).map((block, i) =>
-        block.kind === 'text' ? (
-          <p key={i} style={{ whiteSpace: 'pre-wrap', margin: '0 0 6px' }}>{block.text}</p>
-        ) : block.kind === 'chart' ? (
-          // Monospace so the bars line up. Rendered as text, so nothing can inject HTML.
-          <pre key={i} style={{ fontFamily: "'Courier New', monospace", fontSize: 10, lineHeight: 1.35, whiteSpace: 'pre', overflowX: 'auto', margin: '6px 0', padding: '4px 6px', background: 'rgba(255,255,255,0.04)' }}>{block.text}</pre>
-        ) : (
-          <div key={i} style={{ overflowX: 'auto', margin: '6px 0' }}>
-            <table style={{ borderCollapse: 'collapse', fontSize: 11, width: '100%' }}>
+      {parseAnswer(text).map((block, i) => {
+        if (block.kind === 'text')
+          return <p key={i} style={{ whiteSpace: 'pre-wrap', margin: '0 0 6px' }}>{block.text}</p>;
+        if (block.kind === 'table')
+          return (
+            <div key={i} style={{ overflowX: 'auto', margin: '6px 0' }}>
+              <table style={{ borderCollapse: 'collapse', fontSize: 12, width: '100%' }}>
               <thead>
                 <tr>
                   {block.rows[0]?.map((cell, c) => (
@@ -90,9 +157,10 @@ function Answer({ text }: { text: string }) {
                 ))}
               </tbody>
             </table>
-          </div>
-        )
-      )}
+            </div>
+          );
+        return <Chart key={i} spec={block.spec} />;
+      })}
     </>
   );
 }
@@ -100,7 +168,7 @@ function Answer({ text }: { text: string }) {
 function cellStyle(head: boolean) {
   return {
     border: '1px solid rgba(255,255,255,0.12)',
-    padding: '4px 8px',
+    padding: '5px 8px',
     textAlign: 'left' as const,
     verticalAlign: 'top' as const,
     ...(head ? { fontWeight: 700, color: 'rgba(255,255,255,0.7)' } : {}),
@@ -218,16 +286,18 @@ export default function DarylChat({ activeSite, api }: Props) {
   }
 
   return (
-    <div
-      onPointerDown={keepInside}
-      onDoubleClick={keepInside}
-      onKeyDown={(e: KeyboardEvent) => { if (e.key === 'Escape' && open) setOpen(false); }}
-      style={{
-        position: 'fixed', right: 20, bottom: 72, zIndex: 30, pointerEvents: 'auto',
-        width: 'min(280px, calc(100vw - 24px))',
-        background: 'rgba(0,0,0,0.88)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff',
-      }}
-    >
+    <>
+      <div
+        className="daryl-chat-window"
+        onPointerDown={keepInside}
+        onDoubleClick={keepInside}
+        onKeyDown={(e: KeyboardEvent) => { if (e.key === 'Escape' && open) setOpen(false); }}
+        style={{
+          position: 'fixed', left: 20, bottom: 72, zIndex: 30, pointerEvents: 'auto',
+          width: 'min(300px, calc(100vw - 24px))',
+          background: 'rgba(0,0,0,0.88)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff',
+        }}
+      >
       <button
         ref={headerRef}
         type="button"
@@ -241,7 +311,7 @@ export default function DarylChat({ activeSite, api }: Props) {
       >
         <span>
           <span style={{ ...FONT_SMALL, display: 'block', color: 'rgba(255,255,255,0.3)', lineHeight: 1 }}>Mission Assistant</span>
-          <span style={{ display: 'block', fontSize: 12, fontWeight: 900, letterSpacing: '0.05em', textTransform: 'uppercase', marginTop: 2 }}>
+          <span style={{ display: 'block', fontSize: 14, fontWeight: 900, letterSpacing: '0.05em', textTransform: 'uppercase', marginTop: 2 }}>
             Daryl
           </span>
         </span>
@@ -249,13 +319,13 @@ export default function DarylChat({ activeSite, api }: Props) {
       </button>
 
       {open && (
-        <div id="daryl-body" role="region" aria-label="Chat with Daryl" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+        <div id="daryl-body" className="daryl-chat-body" role="region" aria-label="Chat with Daryl" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
           <div
             ref={logRef}
             role="log"
             aria-live="polite"
             style={{
-              height: 'min(210px, calc(100vh - 320px))', minHeight: 110, overflowY: 'auto',
+              height: 'min(320px, calc(100vh - 280px))', minHeight: 150, overflowY: 'auto',
               padding: 10, display: 'flex', flexDirection: 'column', gap: 6,
             }}
           >
@@ -263,7 +333,7 @@ export default function DarylChat({ activeSite, api }: Props) {
               <div
                 key={m.id}
                 style={{
-                  maxWidth: '95%', padding: '6px 8px', fontSize: 11, lineHeight: 1.45, overflowWrap: 'anywhere',
+                  maxWidth: '95%', padding: '7px 9px', fontSize: 13, lineHeight: 1.5, overflowWrap: 'anywhere',
                   alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
                   background: m.role === 'user' ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.04)',
                   border: `1px solid ${m.role === 'user' ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.08)'}`,
@@ -296,7 +366,7 @@ export default function DarylChat({ activeSite, api }: Props) {
               disabled={busy}
               onClick={send}
               style={{
-                padding: '6px 12px', fontSize: 10, fontWeight: 700, letterSpacing: '1.1px', textTransform: 'uppercase',
+                padding: '7px 12px', fontSize: 12, fontWeight: 700, letterSpacing: '1.1px', textTransform: 'uppercase',
                 color: '#fff', background: 'transparent', border: '1px solid #fff', borderRadius: 32,
                 cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.4 : 1,
               }}
@@ -306,6 +376,17 @@ export default function DarylChat({ activeSite, api }: Props) {
           </div>
         </div>
       )}
-    </div>
+      </div>
+      <style>{`
+        @media (max-width: 700px) {
+          .daryl-chat-window {
+            left: 12px !important;
+            right: auto !important;
+            bottom: 64px !important;
+            width: min(300px, calc(50vw - 18px)) !important;
+          }
+        }
+      `}</style>
+    </>
   );
 }

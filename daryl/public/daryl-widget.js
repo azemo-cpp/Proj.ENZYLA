@@ -165,7 +165,7 @@ Gumagamit ng Shadow DOM, kaya hindi nito ginugulo ang styles ng website mo. */
       const reply = addMessage("daryl", "Thinking...");
 
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 90000);
+      const timer = setTimeout(() => controller.abort(), 30000);
       const payload = opts.settings ? { question, settings: opts.settings } : { question };
 
       try {

@@ -1,64 +1,82 @@
 # Daryl
 
-A lunar mission assistant that lives inside Project Enzyla, in this `daryl/` folder. You ask in plain English,
-for example "Compare Apollo 11 and Apollo 17 for 10 days", and he answers from his own Sun and Earth model:
-how much of the time a site is sunlit (power), how much Earth is in view (radio contact), the longest darkness,
-and the longest communication outage.
+Daryl is a lunar mission assistant. Ask him things like "Compare Apollo 11 and Apollo 17 for 10 days" and he
+tells you how much sunlight a site gets, how often Earth is in view for radio contact, and how long the worst
+dark stretches are. His numbers are good for comparing sites, not for real mission planning.
 
-Around him is a safety system. Every answer is checked, failures are diagnosed and logged, and an optional
-free AI (Ollama) can read the log and propose fixes. Proposed fixes are tested on a copy first, and a human
-has to approve them. Daryl himself is a rule-based calculator, not a chat AI, and his numbers are approximate:
-good for comparing sites, not for real mission planning.
+Every answer is checked automatically. If something goes wrong, it gets logged, and an optional AI (Ollama)
+can look at the log and suggest a fix — but it never changes anything without your approval.
 
 ## Run it
 
-From the main project folder (the one with `package.json`), not from this folder:
+From the main project folder (not this folder):
 
-    npm run dev          the app and Daryl together (Daryl runs at http://localhost:8787)
-    npm run daryl        only Daryl's server
-    npm run test:daryl   all of Daryl's tests
+    npm run dev          starts the app and Daryl together (Daryl runs at http://localhost:8787)
+    npm run daryl        starts only Daryl
+    npm run test:daryl   runs Daryl's tests
 
-On Windows PowerShell use `npm.cmd` instead of `npm`. Needs Node.js 18 or newer (22.8+ for the sandbox).
-Daryl has no packages of his own to install.
+On Windows use `npm.cmd` instead of `npm`. Needs Node.js 18 or newer.
 
-## Where his data comes from
+## Add AI chat (optional)
 
-The sites are read from `database/lroc-sites.ts` when Daryl starts. Set `DARYL_SITES_FILE` to use a different file that exports `APOLLO_SITES`.
-Restart after changing that file. Details in [database/README.md](database/README.md).
+By default Daryl answers lunar questions on his own. If you connect a local AI model through Ollama, he can
+also handle anything else — jokes, general questions, follow-ups. If Ollama isn't installed or something goes
+wrong, Daryl just answers on his own as usual.
 
-## Add a language model (optional)
+### Mac or Linux
 
-Daryl works without one. With a model switched on, it answers the questions he doesn't recognise, using only
-his own facts (the numbers for every site) and the last few messages, so follow-ups like "what about the other
-one?" can work. Questions he already understands stay exact and never go to the model. If the model is slow,
-fails, or mentions a number that isn't in the facts, Daryl gives his own answer instead.
+1. Install Ollama from https://ollama.com.
+2. Run `ollama pull llama3.2:3b`.
+3. In `providers/ollama.config.js` set `daryl.enabled` to `true`.
+4. Restart.
 
-Free and on your own computer, with Ollama:
+### Windows
 
-1. Install Ollama from ollama.com, then run `ollama pull llama3.2:3b`.
-2. In `providers/ollama.config.js`, set `daryl.enabled` to `true` (change `model` if you pulled a different one).
-3. Restart `npm run dev`.
+On some Windows machines Ollama crashes when it tries to use the GPU. The fix is to tell it to use the CPU
+instead — do this **before** installing Ollama.
 
-Another model (OpenAI, Gemini, Claude...): give Daryl a `generate(prompt, signal)` function that returns text.
-See `createDarylProvider` in `providers/lunar/index.js`. Visitors' questions would go to that company, so keep
-API keys in environment variables, never in the code.
+1. Press **Win + R**, type `sysdm.cpl`, hit Enter.
+2. Go to **Advanced → Environment Variables**.
+3. Under **User variables** click **New** and add:
+   - Name: `OLLAMA_VULKAN`
+   - Value: `false`
+4. Click OK, then install Ollama from https://ollama.com/download.
+5. Run `ollama pull llama3.2:3b`.
+6. In `providers/ollama.config.js` set `daryl.enabled` to `true`.
+7. Restart.
+
+> Already installed and it's crashing? Set `OLLAMA_VULKAN=false` as above, then right-click the Ollama icon
+> in the system tray and restart it.
+
+## Run the doctor
+
+The doctor looks at the error log and asks an AI model to suggest a fix. It never touches your code — it
+only saves a suggestion that you can read and test first.
+
+**One-time setup:** pull the model (about 8 GB — skip this if you're low on space and use `llama3.1:8b` instead):
+
+    ollama pull gemma4:12b
+
+To use `llama3.1:8b` instead, change `doctorModel` in `providers/ollama.config.js` and run `ollama pull llama3.1:8b`.
+
+**Run it** from the `daryl/` folder:
+
+    node doctor.js
+
+The suggestion is saved to `proposals/`. To test it without touching your real files:
+
+    node sandbox.js proposals/<the file it saved>
 
 ## What's inside
 
-| Folder | What it is |
+| Folder | What it does |
 |---|---|
-| `providers/lunar/` | Daryl himself: the engine (questions and answers) and the planner (the calculations) |
-| `database/` | Reads the site list from `lroc-sites.ts` (or the file in `DARYL_SITES_FILE`) |
-| `protected/` | The pipeline every question goes through |
-| `diagnostics/`, `agents/` | The checks, the failure diagnosis, and the incident log |
-| `doctor/`, `doctor.js` | The Ollama doctor that proposes fixes (never edits anything) |
-| `sandbox.js`, `doctor/sandbox.js` | Tests a proposed fix on a copy of the project |
-| `server/`, `server.js` | The web API |
-| `public/` | A demo page and a plain-script widget (the app uses `src/components/DarylChat.tsx` instead) |
+| `providers/lunar/` | Daryl's brain — the questions, answers and calculations |
+| `database/` | Loads the site list from `database/lroc-sites.ts` |
+| `protected/` | Every question passes through here before being answered |
+| `diagnostics/`, `agents/` | Checks answers, logs errors |
+| `doctor/`, `doctor.js` | The AI that suggests fixes |
+| `sandbox.js` | Tests a suggestion on a copy so your files stay safe |
+| `server/`, `server.js` | The web server |
+| `public/` | The demo page at http://localhost:8787 |
 
-## Before putting it online
-
-- Daryl's server must run somewhere that stays on (a host that runs Node). A file-only host can serve the app
-  but not Daryl. The host needs this `daryl/` folder.
-- Use HTTPS, and set `ALLOWED_ORIGINS` to your website. The server has no logins, only a rate limit.
-- `memory/incidents.json` holds what visitors typed. Keep it private (it's in `.gitignore`).

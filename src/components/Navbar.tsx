@@ -27,7 +27,7 @@ export default function Navbar() {
   }
 
   return (
-    <nav style={{
+    <nav className="app-navbar" style={{
       position: 'fixed', top: 0, left: 0, right: 0, height: 56,
       background: 'rgba(0,0,0,0.5)',
       zIndex: 20,
@@ -98,7 +98,7 @@ export default function Navbar() {
           flexShrink: 0,
         }} aria-hidden />
         <span style={{
-          fontSize: 9, letterSpacing: '0.15em',
+          fontSize: 11, letterSpacing: '0.15em',
           textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)',
           fontVariantNumeric: 'tabular-nums',
         }}>

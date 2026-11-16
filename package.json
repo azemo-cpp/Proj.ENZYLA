@@ -1,13 +1,28 @@
 {
   "name": "negaton-space",
-  "private": true,
   "version": "0.0.0",
+  "private": true,
   "type": "module",
   "scripts": {
-    "dev": "concurrently -k -n web,daryl \"vite\" \"npm --prefix daryl start\"",
-    "dev:web": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview"
+    "dev": "node scripts/dev.mjs",
+    "daryl": "node daryl/server.js",
+    "test:daryl": "node --test daryl/tests/*.js",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "generate:moon-textures": "node scripts/generateMoonTextures.mjs",
+    "generate:moon-lroc": "node scripts/generateMoonTextures.mjs --lroc-color"
+  },
+  "dependencies": {
+    "@gsap/react": "^2.1.2",
+    "clsx": "^2.1.1",
+    "gsap": "^3.15.0",
+    "geotiff": "^3.0.5",
+    "lucide-react": "^1.60.0",
+    "postprocessing": "^6.39.5",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-icons": "^5.7.0",
+    "three": "^0.186.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",
@@ -16,21 +31,9 @@
     "@types/three": "^0.186.0",
     "@vitejs/plugin-react": "^6.1.2",
     "autoprefixer": "^10.6.1",
-    "concurrently": "^10.0.7",
     "postcss": "^8.5.31",
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.2",
     "vite": "^8.3.0"
-  },
-  "dependencies": {
-    "@gsap/react": "^2.1.2",
-    "clsx": "^2.1.1",
-    "gsap": "^3.15.0",
-    "lucide-react": "^1.60.0",
-    "postprocessing": "^6.39.5",
-    "react": "^19.3.1",
-    "react-dom": "^19.3.1",
-    "react-icons": "^5.7.0",
-    "three": "^0.186.1"
   }
 }

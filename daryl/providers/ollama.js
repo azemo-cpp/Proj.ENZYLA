@@ -53,7 +53,9 @@ export function createOllamaProvider({
       }
 
       const data = await response.json();
-      return typeof data.response === "string" ? data.response : "";
+      // gemma4 and other thinking models put their answer in `thinking` when `response` is empty
+      const text = typeof data.response === "string" ? data.response : "";
+      return text || (typeof data.thinking === "string" ? data.thinking : "");
     }
   };
 }

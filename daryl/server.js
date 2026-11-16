@@ -2,7 +2,6 @@
 Settings (optional, environment variables): PORT, HOST, ALLOWED_ORIGINS (comma list), TRUST_PROXY=1 */
 import { createApp } from "./server/app.js";
 import { OLLAMA } from "./providers/ollama.config.js";
-import { createOllamaProvider } from "./providers/ollama.js";
 import { SITES, SITES_ERROR } from "./database/sites.js";
 
 const port = Number(process.env.PORT ?? 8787);
@@ -38,16 +37,6 @@ server.listen(port, host, () => {
   const shown = server.address().port;
   console.log(`Daryl is running at http://${host === "127.0.0.1" ? "localhost" : host}:${shown}`);
   console.log("Press Ctrl+C to stop.");
-
-  /* Pinapainit ang model habang nag-i-start, para ang unang tanong ay hindi na naghihintay sa pag-load nito. */
-  if (OLLAMA.daryl.enabled) {
-    const started = Date.now();
-    console.log(`Loading the AI model (${OLLAMA.daryl.model})... the first answer may be slow until this finishes.`);
-    createOllamaProvider({ url: OLLAMA.url, model: OLLAMA.daryl.model, options: { num_predict: 1 } })
-      .run("hi", AbortSignal.timeout(180000))
-      .then(() => console.log(`AI model ready (${Math.round((Date.now() - started) / 1000)}s).`))
-      .catch(e => console.warn(`AI model not ready: ${e.message}`));
-  }
 });
 
 function shutdown() {

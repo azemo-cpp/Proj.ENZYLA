@@ -1,18 +1,12 @@
-# database/
+# Daryl database
 
-Dito galing ang site data ni Daryl.
+- `lroc-sites.ts` is the default site list. `sites.js` loads it and exposes `SITES`, `SITES_FILE`, and `SITES_ERROR`. Set `DARYL_SITES_FILE` to load a different file.
+- `load-sites.js` loads the site data; `parse-apollo.js` reads the TypeScript data format when the Node version cannot import it directly.
+- The lunar planner puts `SITES` in the AI context. Daryl uses each site's name, coordinates, and optional description when answering site questions.
+- `build-thermal.js` reads Diviner level 4 `.xyz` files and generates `site-thermal.json`. The AI does not currently load that generated thermal file.
 
-- Ang default ng `sites.js` ay ang `lroc-sites.ts` (33 LROC site, mga coordinate mula sa NASA NSSDC). Para gumamit ng ibang listahan, itakda ang `DARYL_SITES_FILE` sa file na may export na `APOLLO_SITES`.
-  I-restart si Daryl (`npm run dev`) pagkatapos mong baguhin ang file.
-- `load-sites.js` ang nagbabasa. Una, diretso ang import ng .ts file (kaya ito ng Node 22.18 pataas).
-  Kung hindi kaya ng Node mo, binabasa na lang ang text ng file gamit ang `parse-apollo.js`. Pareho ang resulta.
-- Ang kinukuha lang ni Daryl sa bawat site ay `name`, `lat`, `lon` at `description`. Optional ang description.
-- Kung hindi mabasa ang file, hindi tumitigil si Daryl: walang laman ang listahan, may babala sa terminal,
-  at ang chat ay nagsasabing hindi pa siya handa.
-- `DARYL_SITES_FILE` ang pwedeng i-set kung ibang file ang gusto mong gamitin.
+To regenerate the thermal file from a folder containing `diviner_tbol_max.xyz` and `diviner_tbol_min.xyz`, run:
 
-Kapag real database na ang gagamitin: palitan ang laman ng `sites.js` ng listahan sa format na
-`[name, latitude, longitude, description]`, at burahin ang `load-sites.js` at `parse-apollo.js`.
-Huwag maglagay ng database password sa mga file na ito. Gamitin ang `.env` at huwag i-upload sa GitHub.
-
-Ang `memory/incidents.json` ay pwede ring ilipat sa database. Tumatanggap na ng `store` option ang `runDiagnosticCycle`.
+```powershell
+node database/build-thermal.js "C:\path\to\diviner-files"
+```
