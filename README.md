@@ -1,6 +1,3 @@
-
-
-
 - full screen 3D moon rendered in the browser, no downloads
 - click anywhere on the moon → camera zooms in smooth
 - shows real Apollo landing site infos (coordinates, what they did there, how much they collected)
@@ -63,7 +60,7 @@ npm run generate:moon-textures
 The LROC generator reads `data/lroc_color_poles_8k.tif` and writes the global
 and coarse color textures into `public/`. The WAC generator reads
 `data/LRO_WAC_Mosaic_Global_303ppd.tif`; this optional source TIFF is about
-5.7 GiB and is not downloaded by the launcher. Place it in `data/` before
+5.7 GiB and is not downloaded by the launcher. Download it via https://astrogeology.usgs.gov/search/map/moon_lro_lroc_wac_global_morphology_mosaic_100m then place it in `data/` before
 running the WAC generator.
 
 The Moon is a procedural sphere textured with `data/lroc_color_poles_8k.tif`
