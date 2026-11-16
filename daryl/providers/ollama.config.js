@@ -26,7 +26,6 @@ export const OLLAMA = {
   daryl: {
     enabled: true,
     model: "llama3.2:3b",
-    // Pinakamaraming token sa sagot. Mas maikli = mas mabilis sa mabagal na computer.
     maxTokens: 250,
     timeoutMs: 60000
   }
