@@ -31,10 +31,15 @@ The built-in Apollo landing site data is maintained in `src/data/landingSites.js
 
 ```bash
 npm install
-npm run dev
 ```
 
-then open `http://localhost:5173`
+On Windows, double-click `run.bat`. It checks for
+`data/LRO_WAC_Mosaic_Global_303ppd.tif`, downloads it from the
+[USGS WAC mosaic catalog](https://astrogeology.usgs.gov/search/map/moon_lro_lroc_wac_global_morphology_mosaic_100m)
+if needed, verifies the downloaded size, and resumes an interrupted download
+when run again. The file is about 5.7 GiB.
+
+On other platforms, run `npm run dev`, then open `http://localhost:5173`.
 
 To generate the global LROC color textures from
 `lroc_color_poles_8k.tif` in the project root, run:
