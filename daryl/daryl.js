@@ -5,7 +5,6 @@ import { stdin as input, stdout as output } from "node:process";
 import { runDiagnosticCycle } from "./protected/run.js";
 import { createDarylProvider, SITES } from "./providers/lunar/index.js";
 import { summarizeIncidents } from "./diagnostics/learning.js";
-import { OLLAMA } from "./providers/ollama.config.js";
 
 function arg(name, fallback) {
   const i = process.argv.indexOf(`--${name}`);
@@ -42,10 +41,7 @@ while (true) {
     continue;
   }
 
-  const result = await runDiagnosticCycle(line, daryl, {
-    // Mas matagal kapag naka-on ang model, para hindi maunahan ng pipeline ang Ollama (cold start)
-    timeoutMs: OLLAMA.daryl.enabled ? OLLAMA.daryl.timeoutMs + 15000 : 15000
-  });
+  const result = await runDiagnosticCycle(line, daryl, { timeoutMs: 15000 });
 
   if (result.status === "SUCCESS") {
     console.log(`\nDaryl: ${result.output}\n`);

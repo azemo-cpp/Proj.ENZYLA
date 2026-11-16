@@ -69,7 +69,7 @@ if (!args.includes("--yes")) {
 console.log("\nRunning tests on a copy. Ito ay baka matagalan ng ilang segundo...\n");
 const result = await testInSandbox({
   root, changes, keep: args.includes("--keep"),
-  dataFiles: { DARYL_SITES_FILE: SITES_FILE } // ang sites file ay ipinapasa sa sandbox sa pamamagitan ng DARYL_SITES_FILE
+  dataFiles: { DARYL_SITES_FILE: SITES_FILE } // ang apolloSites.ts ay nasa labas ng daryl folder
 });
 
 const lines = [`Status: ${result.status}`];

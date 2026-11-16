@@ -36,6 +36,38 @@ test("Daryl answers a site comparison through the pipeline", async () => {
   assert.ok(result.output.includes(nameB));
 });
 
+test("Daryl resolves an abbreviated site name in a comparison", async () => {
+  const daryl = createDarylProvider({ startMs: START, generate: false });
+  const answer = await daryl.run("compare apollo 12 and 17");
+  assert.ok(answer.includes("Apollo 12"));
+  assert.ok(answer.includes("Apollo 17"));
+  assert.ok(!answer.includes("Name two sites to compare"));
+});
+
+test("Daryl recognizes the common comparison typo", async () => {
+  const daryl = createDarylProvider({ startMs: START, generate: false });
+  const answer = await daryl.run("comapre apollo 11 and 12");
+  assert.ok(answer.includes("| Measure | Apollo 11 | Apollo 12 |"));
+});
+
+test("Daryl uses prior sites for a table follow-up without calling Ollama", async () => {
+  let modelCalls = 0;
+  const daryl = createDarylProvider({
+    startMs: START,
+    history: [
+      { role: "user", text: "comapre apollo 11 and 12" },
+      { role: "daryl", text: "Apollo 11 site details..." }
+    ],
+    generate: async () => {
+      modelCalls++;
+      return "An empty table";
+    }
+  });
+  const answer = await daryl.run("make it into a table");
+  assert.ok(answer.includes("| Measure | Apollo 11 | Apollo 12 |"));
+  assert.equal(modelCalls, 0);
+});
+
 test("Daryl explains the colours", async () => {
   const daryl = createDarylProvider({ startMs: START });
   const result = await runDiagnosticCycle("What does the red mean?", daryl, {
@@ -94,7 +126,7 @@ test("Daryl finds a site by its full name, in any letter case", async () => {
 });
 
 test("a name that isn't in the site list doesn't pull up any site", async () => {
-  const daryl = createDarylProvider({ startMs: START });
+  const daryl = createDarylProvider({ startMs: START, generate: false });
   const answer = await daryl.run("Tell me about Nowhere Base");
   assert.ok(!SITES.some(([name]) => answer.includes(`${name}:`)));
 });
@@ -108,7 +140,7 @@ test("a site's description from the data is used in its info", async () => {
 });
 
 test("the example questions use real site names, not placeholders", async () => {
-  const daryl = createDarylProvider({ startMs: START });
+  const daryl = createDarylProvider({ startMs: START, generate: false });
   const answer = await daryl.run("asdfgh qwerty");
   assert.ok(!answer.includes("{A}") && !answer.includes("{B}"));
   assert.ok(answer.includes(nameA));

@@ -102,7 +102,7 @@ async function runRestricted(dir, permission, timeoutMs, extraEnv = {}) {
   return summary;
 }
 
-/* dataFiles: { ENV_NAME: "/path/to/file" } para sa mga file na nasa labas ng project (gaya ng sites file).
+/* dataFiles: { ENV_NAME: "/path/to/file" } para sa mga file na nasa labas ng project (gaya ng apolloSites.ts).
 Kinokopya ang file sa loob ng sandbox at ang ENV_NAME ay tumuturo sa kopya, kaya hindi lumalabas sa copy ang code. */
 export async function testInSandbox({ root, changes, timeoutMs = 60000, keep = false, dataFiles = {} }) {
   const hash = patchHash(changes);

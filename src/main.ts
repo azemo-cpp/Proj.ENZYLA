@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
+import { APOLLO_SITES } from './data/apolloSites';
 
 // --- Renderer ----------------------------------------------------------------
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -216,6 +216,7 @@ const layer4=(()=>{
 
 // --- Zoom state ---------------------------------------------------------------
 let moonGroup: THREE.Group|null=null;
+function getMoonGroup():THREE.Group|null{return moonGroup;}
 let isZoomed=false, isAnimating=false;
 let currentAnimFrame: number|null=null;
 
@@ -269,12 +270,6 @@ function zoomTo(dir:THREE.Vector3, lm:{name:string,type:string,desc:string,lat:n
   currentAnimFrame=requestAnimationFrame(tick);
 }
 const LANDMARKS = [
-  {name:'Apollo 11',   lat: 0.67, lon: 23.47, type:'Landing Site', desc:'First crewed lunar landing, July 20 1969, Sea of Tranquility.'},
-  {name:'Apollo 12',   lat:-3.01, lon:-23.42, type:'Landing Site', desc:'Second crewed lunar landing, Nov 1969, Ocean of Storms.'},
-  {name:'Apollo 14',   lat:-3.65, lon:-17.47, type:'Landing Site', desc:'Fra Mauro Highlands, Feb 1971. Alan Shepard and Edgar Mitchell.'},
-  {name:'Apollo 15',   lat:26.13, lon:  3.63, type:'Landing Site', desc:'Hadley-Apennine, Jul 1971. First mission to use the lunar rover.'},
-  {name:'Apollo 16',   lat:-8.97, lon: 15.50, type:'Landing Site', desc:'Descartes Highlands, Apr 1972. John Young and Charles Duke.'},
-  {name:'Apollo 17',   lat:20.19, lon: 30.77, type:'Landing Site', desc:'Taurus-Littrow valley, Dec 1972. Last crewed Moon landing to date.'},
   {name:'Tycho',       lat:-43.31,lon:-11.22, type:'Crater',       desc:'Prominent ray crater 85 km wide, ~108 million years old.'},
   {name:'Copernicus',  lat:  9.62, lon:-20.08,type:'Crater',       desc:'93 km diameter impact crater, formed ~800 million years ago.'},
   {name:'Aristarchus', lat: 23.73, lon:-47.40,type:'Crater',       desc:'Brightest crater on the near side, highly reflective walls.'},
@@ -287,6 +282,12 @@ const LANDMARKS = [
   {name:'Mare Crisium',lat:17.0,  lon: 59.1,  type:'Mare',         desc:'Sea of Crises. Isolated circular basin near the eastern limb.'},
   {name:'Montes Apenninus',lat:18.9,lon:3.7,  type:'Mountains',    desc:'600 km range forming the southeastern border of Mare Imbrium.'},
   {name:'Montes Alps',  lat:48.5, lon: 0.5,   type:'Mountains',    desc:'Lunar Alps bordering Mare Imbrium to the north.'},
+];
+const ALL_LANDMARKS = [
+  ...LANDMARKS,
+  ...APOLLO_SITES.map(site => ({
+    name: site.name, lat: site.lat, lon: site.lon, type: 'Landing Site', desc: site.description,
+  })),
 ];
 
 
@@ -342,11 +343,12 @@ function zoomOut(){
 // Click to zoom � works even when already zoomed (seamless re-zoom to new point)
 const raycaster=new THREE.Raycaster();
 window.addEventListener('pointerdown',(e:PointerEvent)=>{
-  if(e.button!==0||!moonGroup||isAnimating)return;
+  const moon=getMoonGroup();
+  if(e.button!==0||!moon||isAnimating)return;
   const px=new THREE.Vector2((e.clientX/innerWidth)*2-1,-(e.clientY/innerHeight)*2+1);
   raycaster.setFromCamera(px,camera);
   const meshes:THREE.Mesh[]=[];
-  moonGroup.traverse(c=>{if(c instanceof THREE.Mesh)meshes.push(c);});
+  moon.traverse(c=>{if(c instanceof THREE.Mesh)meshes.push(c);});
   const hits=raycaster.intersectObjects(meshes,true);
   if(!hits.length)return;
   const hitPt=hits[0].point.clone();
@@ -354,7 +356,7 @@ window.addEventListener('pointerdown',(e:PointerEvent)=>{
   // Find nearest landmark within 8�
   const COS8=Math.cos(8*Math.PI/180);
   let bestLm=null,bestDot=COS8;
-  LANDMARKS.forEach(lm=>{
+  ALL_LANDMARKS.forEach(lm=>{
     const lat=lm.lat*Math.PI/180, lon=lm.lon*Math.PI/180;
     const d=new THREE.Vector3(Math.cos(lat)*Math.sin(lon),Math.sin(lat),Math.cos(lat)*Math.cos(lon));
     const dot=dir.dot(d);
@@ -369,39 +371,6 @@ window.addEventListener('pointerdown',(e:PointerEvent)=>{
 });
 
 window.addEventListener('dblclick',()=>{if(isZoomed&&!isAnimating)zoomOut();});
-
-// --- Moon GLB ----------------------------------------------------------------
-new GLTFLoader().load('/moon.glb',(gltf)=>{
-  const moon=gltf.scene;
-  const box=new THREE.Box3().setFromObject(moon);
-  const center=box.getCenter(new THREE.Vector3());
-  const size=box.getSize(new THREE.Vector3());
-  const scale=2.0/Math.max(size.x,size.y,size.z);
-  moon.scale.setScalar(scale);
-  moon.position.set(-center.x*scale,-center.y*scale,-center.z*scale);
-
-  // Keep GLB's own UV-mapped textures � DO NOT replace with equirectangular texture
-  // Just boost normal map and roughness for more visible surface detail
-  moon.traverse(child=>{
-    if(!(child instanceof THREE.Mesh))return;
-    child.castShadow=child.receiveShadow=true;
-    const m=child.material as THREE.MeshStandardMaterial;
-    if(m&&'roughness'in m){
-      m.roughness=0.90;
-      m.metalness=0.0;
-      m.envMapIntensity=0.0;
-      // Boost normal map for more pronounced crater depth/relief
-      if(m.normalMap) m.normalScale.set(3.5, 3.5);
-      if(m.bumpMap)   m.bumpScale = 0.12;
-      m.needsUpdate=true;
-    }
-  });
-
-  scene.add(moon);
-  moonGroup=moon as THREE.Group;
-  console.log('? Moon loaded');
-},({loaded,total})=>console.log(`Moon: ${Math.round(loaded/total*100)}%`),
-(err)=>console.error('? Moon:',err));
 
 // --- Post-processing ----------------------------------------------------------
 const composer=new EffectComposer(renderer);

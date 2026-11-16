@@ -9,6 +9,8 @@ import { fileURLToPath } from "node:url";
 
 import { runDiagnosticCycle } from "../protected/run.js";
 import { createDarylProvider, SITES } from "../providers/lunar/index.js";
+import { makeContext } from "../providers/lunar/planner.js";
+import { compareSites, categoryOf, MIN_COMPARE, MAX_COMPARE } from "../providers/lunar/compare.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.resolve(here, "../public");
@@ -44,7 +46,7 @@ function checkSettings(input) {
   if (input === undefined || input === null) return { settings: {} };
   if (typeof input !== "object" || Array.isArray(input)) return { error: "settings must be an object." };
 
-  const known = new Set(["siteA", "siteB", "days", "date", "mask"]);
+  const known = new Set(["siteA", "siteB", "sites", "days", "date", "mask"]);
   for (const key of Object.keys(input)) {
     if (!known.has(key)) return { error: `Unknown setting: ${key}.` };
   }
@@ -63,6 +65,16 @@ function checkSettings(input) {
     int("siteB", 0, SITES.length - 1) ||
     int("days", 2, 60);
   if (problem) return { error: problem };
+
+  // Ang mga site na kasalukuyang kinukumpara sa app (para alam ni Daryl kung ano ang "these sites")
+  if (input.sites !== undefined) {
+    const list = input.sites;
+    const ok = Array.isArray(list) && list.length >= MIN_COMPARE && list.length <= MAX_COMPARE &&
+      new Set(list).size === list.length &&
+      list.every(i => Number.isInteger(i) && i >= 0 && i < SITES.length);
+    if (!ok) return { error: `sites must be ${MIN_COMPARE} to ${MAX_COMPARE} different site numbers from 0 to ${SITES.length - 1}.` };
+    settings.sites = list;
+  }
 
   if (input.mask !== undefined) {
     if (typeof input.mask !== "number" || !(input.mask >= 0 && input.mask <= 10)) {
@@ -174,9 +186,11 @@ export function createApp({
     });
   }
 
-  async function handleAsk(req, res, cors) {
+  // Binabasa at pini-parse ang JSON body. Ibinabalik ang body, o nagpapadala na ng error at nagbabalik ng null.
+  async function readJson(req, res, cors) {
     if (!/^application\/json\b/i.test(req.headers["content-type"] ?? "")) {
-      return sendJson(res, 415, { ok: false, status: "BAD_REQUEST", message: "Content-Type must be application/json." }, cors);
+      sendJson(res, 415, { ok: false, status: "BAD_REQUEST", message: "Content-Type must be application/json." }, cors);
+      return null;
     }
 
     let raw;
@@ -184,17 +198,101 @@ export function createApp({
       raw = await readBody(req);
     } catch (error) {
       if (error.code === 413) {
-        return sendJson(res, 413, { ok: false, status: "BAD_REQUEST", message: "Request is too large." }, cors);
+        sendJson(res, 413, { ok: false, status: "BAD_REQUEST", message: "Request is too large." }, cors);
       }
-      return;
+      return null;
     }
 
-    let body;
     try {
-      body = JSON.parse(raw);
+      return JSON.parse(raw) ?? {};
     } catch {
-      return sendJson(res, 400, { ok: false, status: "BAD_REQUEST", message: "Body must be valid JSON." }, cors);
+      sendJson(res, 400, { ok: false, status: "BAD_REQUEST", message: "Body must be valid JSON." }, cors);
+      return null;
     }
+  }
+
+  async function handleCompare(req, res, cors) {
+    const body = await readJson(req, res, cors);
+    if (body === null) return;
+
+    const { sites, ...rest } = body;
+    const checked = checkSettings(rest);
+    if (checked.error) {
+      return sendJson(res, 400, { ok: false, status: "BAD_REQUEST", message: checked.error }, cors);
+    }
+    if (SITES.length === 0) {
+      return sendJson(res, 503, { ok: false, status: "NO_DATA", message: "Daryl isn't set up yet. Please check back later." }, cors);
+    }
+
+    // sites: hanggang walong index. Tinatanggap din ang pangalan, para hindi nakadepende ang app sa pagkakasunod.
+    const list = Array.isArray(sites)
+      ? sites.map(x => (typeof x === "string" ? SITES.findIndex(s => s[0] === x) : x))
+      : null;
+    if (!list || list.length < MIN_COMPARE || list.length > MAX_COMPARE ||
+        new Set(list).size !== list.length ||
+        !list.every(i => Number.isInteger(i) && i >= 0 && i < SITES.length)) {
+      return sendJson(res, 400, { ok: false, status: "BAD_REQUEST", message: `sites must be ${MIN_COMPARE} to ${MAX_COMPARE} different sites (numbers or names).` }, cors);
+    }
+
+    const { days, startMs, mask } = checked.settings;
+    try {
+      const result = compareSites(list, { days, startMs, mask });
+      return sendJson(res, 200, { ok: true, ...result }, cors);
+    } catch (error) {
+      log.error?.(`compare failed: ${error?.message ?? error}`);
+      return sendJson(res, 400, { ok: false, status: "BAD_REQUEST", message: error?.message ?? GENERIC_ERROR }, cors);
+    }
+  }
+
+  // Hourly Sun and Earth elevation per site, para makabuo ang app ng heatmap at elevation charts.
+  // Ito lang ang detalye ng orbit na ibinabalik sa browser: wala itong daan sa pipeline o sa language model.
+  async function handleSeries(req, res, cors) {
+    const body = await readJson(req, res, cors);
+    if (body === null) return;
+
+    const { sites, ...rest } = body;
+    const checked = checkSettings(rest);
+    if (checked.error) {
+      return sendJson(res, 400, { ok: false, status: "BAD_REQUEST", message: checked.error }, cors);
+    }
+
+    const list = Array.isArray(sites)
+      ? sites.map(x => (typeof x === "string" ? SITES.findIndex(s => s[0] === x) : x))
+      : null;
+    if (!list || list.length < 1 || list.length > MAX_COMPARE ||
+        new Set(list).size !== list.length ||
+        !list.every(i => Number.isInteger(i) && i >= 0 && i < SITES.length)) {
+      return sendJson(res, 400, { ok: false, status: "BAD_REQUEST", message: `sites must be 1 to ${MAX_COMPARE} different sites (numbers or names).` }, cors);
+    }
+
+    const { days, startMs, mask } = checked.settings;
+    const ctx = makeContext({ days, startMs, mask });
+    const round = v => Math.round(v * 10) / 10;
+    const series = list.map(i => {
+      const hourly = ctx.series(SITES[i], ctx.d, ctx.N);
+      return {
+        index: i,
+        name: SITES[i][0],
+        sunEl: hourly.map(p => round(p.sE)),
+        earthEl: hourly.map(p => round(p.eE)),
+        // Azimuth in degrees clockwise from north, for the sky plot.
+        sunAz: hourly.map(p => Math.round(p.sA) % 360),
+        earthAz: hourly.map(p => Math.round(p.eA) % 360)
+      };
+    });
+
+    return sendJson(res, 200, {
+      ok: true,
+      start: new Date(ctx.d).toISOString().slice(0, 10),
+      days: ctx.N / 24,
+      mask: ctx.mask,
+      series
+    }, cors);
+  }
+
+  async function handleAsk(req, res, cors) {
+    const body = await readJson(req, res, cors);
+    if (body === null) return;
 
     const question = body?.question;
     if (typeof question !== "string" || !question.trim()) {
@@ -291,7 +389,9 @@ export function createApp({
     const routes = {
       "/api/health": "GET",
       "/api/sites": "GET",
-      "/api/ask": "POST"
+      "/api/ask": "POST",
+      "/api/compare": "POST",
+      "/api/series": "POST"
     };
     if (!routes[route]) {
       return sendJson(res, 404, { ok: false, status: "NOT_FOUND", message: "Not found." }, cors);
@@ -300,8 +400,9 @@ export function createApp({
       return sendJson(res, 405, { ok: false, status: "BAD_REQUEST", message: "Method not allowed." }, { ...cors, Allow: routes[route] });
     }
 
-    // hindi kasama ang health check sa rate limit, para hindi ma-block ang monitoring
-    if (route !== "/api/health") {
+    // Only the language model is rate limited. Compare and series are pure calculations and the
+    // comparison panel re-requests them on every slider step, so they must not count as abuse.
+    if (route === "/api/ask") {
       const wait = limited(clientIp(req));
       if (wait) {
         return sendJson(res, 429, { ok: false, status: "RATE_LIMITED", message: "Too many requests. Please wait a moment." }, { ...cors, "Retry-After": String(wait) });
@@ -314,9 +415,12 @@ export function createApp({
     if (route === "/api/sites") {
       return sendJson(res, 200, {
         ok: true,
-        sites: SITES.map(([name, latitude, longitude], index) => ({ index, name, latitude, longitude }))
+        sites: SITES.map((s, index) => ({ index, name: s[0], latitude: s[1], longitude: s[2], category: categoryOf(s) })),
+        limits: { minCompare: MIN_COMPARE, maxCompare: MAX_COMPARE }
       }, cors);
     }
+    if (route === "/api/compare") return handleCompare(req, res, cors);
+    if (route === "/api/series") return handleSeries(req, res, cors);
     return handleAsk(req, res, cors);
   }
 

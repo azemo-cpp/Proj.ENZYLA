@@ -73,6 +73,7 @@ function stats(arr, mask, n) {
 export function makeContext({
   siteA = 0,
   siteB = Math.min(4, SITES.length - 1),
+  sites: selection = null,
   startMs = Date.now() + 3 * 864e5,
   days = 14,
   mask = 1
@@ -84,6 +85,8 @@ export function makeContext({
     N: Math.min(60, Math.max(2, Number(days) || 14)) * 24,
     mask: Number(mask) || 0,
     horizon: HORIZON,
-    current: [siteA, siteB]
+    current: [siteA, siteB],
+    // mga site na pinili sa compare panel ng app (2 o higit pa), kung meron
+    selection: Array.isArray(selection) ? selection : null
   };
 }

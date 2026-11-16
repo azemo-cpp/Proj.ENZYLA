@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { APOLLO_SITES } from '../data/apolloSites';
+import type { CustomLandingSite } from '../data/customSites';
 
 interface Landmark {
   name: string;
@@ -10,12 +12,6 @@ interface Landmark {
 }
 
 const LANDMARKS: Landmark[] = [
-  { name: 'Apollo 11', lat: 0.67, lon: 23.47, type: 'Landing Site', desc: 'First crewed lunar landing, July 20 1969, Sea of Tranquility.' },
-  { name: 'Apollo 12', lat: -3.01, lon: -23.42, type: 'Landing Site', desc: 'Second crewed lunar landing, Nov 1969, Ocean of Storms.' },
-  { name: 'Apollo 14', lat: -3.65, lon: -17.47, type: 'Landing Site', desc: 'Fra Mauro Highlands, Feb 1971. Alan Shepard and Edgar Mitchell.' },
-  { name: 'Apollo 15', lat: 26.13, lon: 3.63, type: 'Landing Site', desc: 'Hadley-Apennine, Jul 1971. First mission to use the lunar rover.' },
-  { name: 'Apollo 16', lat: -8.97, lon: 15.50, type: 'Landing Site', desc: 'Descartes Highlands, Apr 1972. John Young and Charles Duke.' },
-  { name: 'Apollo 17', lat: 20.19, lon: 30.77, type: 'Landing Site', desc: 'Taurus-Littrow valley, Dec 1972. Last crewed Moon landing to date.' },
   { name: 'Tycho', lat: -43.31, lon: -11.22, type: 'Crater', desc: 'Prominent ray crater 85 km wide, ~108 million years old.' },
   { name: 'Copernicus', lat: 9.62, lon: -20.08, type: 'Crater', desc: '93 km diameter impact crater, formed ~800 million years ago.' },
   { name: 'Aristarchus', lat: 23.73, lon: -47.40, type: 'Crater', desc: 'Brightest crater on the near side, highly reflective walls.' },
@@ -31,14 +27,14 @@ const LANDMARKS: Landmark[] = [
 ];
 
 const GLOBAL_MIN_DISTANCE = 1.35;
-const SURFACE_CLEARANCE = 0.02;
+const SURFACE_CLEARANCE = 0.007;
 const ZOOM_IN_DISTANCE = 1.45;
 const ZOOM_ORBIT_TANGENT = 0.18;
 const ZOOM_OUT_POSITION = new THREE.Vector3(0, 0.5, 5);
 const SITE_EXIT_DISTANCE = 1.0;
 
 export class MoonCameraController {
-  readonly camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.01, 10000);
+  readonly camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.01, 100000);
 
   private controls: OrbitControls;
   private raycaster = new THREE.Raycaster();
@@ -47,18 +43,22 @@ export class MoonCameraController {
   private currentAnimFrame: number | null = null;
   private activeSurfaceNormal: THREE.Vector3 | null = null;
   private activeSurfaceRadius = 1;
+  private customLandmarks: Landmark[] = [];
 
   constructor(
     private readonly element: HTMLElement,
     private readonly getMoon: () => THREE.Object3D | null,
-    private readonly updateSunForSite: (siteName: string) => void,
+    private readonly updateSunForSite: (siteName: string, lat: number, lon: number) => void,
   ) {
     this.camera.position.set(0, 0.5, 5);
     this.controls = this.createOverviewControls();
 
     this.element.addEventListener('wheel', this.handleWheel, { passive: true });
+    this.element.addEventListener('pointerdown', this.handleMiddlePointerDown, true);
+    this.element.addEventListener('auxclick', this.handleAuxClick);
     window.addEventListener('pointerup', this.handlePointerUp);
     window.addEventListener('dblclick', this.handleDoubleClick);
+    window.addEventListener('mooncustomsiteschange', this.handleCustomSitesChange);
     (window as any).zoomToSite = (lat: number, lon: number, name: string) => this.zoomToSite(lat, lon, name);
     (window as any).zoomOut = () => this.zoomOut();
   }
@@ -69,6 +69,10 @@ export class MoonCameraController {
     this.constrainCameraAboveSelectedSurface();
   }
 
+  get distanceToTarget() {
+    return this.camera.position.distanceTo(this.controls.target);
+  }
+
   resize(width = innerWidth, height = innerHeight) {
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
@@ -77,8 +81,11 @@ export class MoonCameraController {
   dispose() {
     if (this.currentAnimFrame !== null) cancelAnimationFrame(this.currentAnimFrame);
     this.element.removeEventListener('wheel', this.handleWheel);
+    this.element.removeEventListener('pointerdown', this.handleMiddlePointerDown, true);
+    this.element.removeEventListener('auxclick', this.handleAuxClick);
     window.removeEventListener('pointerup', this.handlePointerUp);
     window.removeEventListener('dblclick', this.handleDoubleClick);
+    window.removeEventListener('mooncustomsiteschange', this.handleCustomSitesChange);
     this.controls.dispose();
   }
 
@@ -178,6 +185,15 @@ export class MoonCameraController {
     controls.mouseButtons.LEFT = THREE.MOUSE.PAN;
     controls.mouseButtons.RIGHT = THREE.MOUSE.ROTATE;
     controls.enablePan = false;
+    controls.addEventListener('end', () => {
+      if (!this.isZoomed) return;
+      const normal = this.activeSurfaceNormal;
+      const detail = normal ? {
+        lat: THREE.MathUtils.radToDeg(Math.asin(THREE.MathUtils.clamp(normal.y, -1, 1))),
+        lon: THREE.MathUtils.radToDeg(Math.atan2(normal.x, normal.z)),
+      } : undefined;
+      window.dispatchEvent(new CustomEvent('moonmove', { detail }));
+    });
   }
 
   private createOverviewControls() {
@@ -311,15 +327,19 @@ export class MoonCameraController {
       this.controls.enabled = true;
       this.controls.update();
       this.constrainCameraAboveSelectedSurface();
+      const latitude = THREE.MathUtils.radToDeg(Math.asin(
+        THREE.MathUtils.clamp(siteNormal.y, -1, 1),
+      ));
+      const longitude = THREE.MathUtils.radToDeg(Math.atan2(siteNormal.x, siteNormal.z));
       window.dispatchEvent(new CustomEvent('moonclick', {
         detail: {
           name: landmark?.name || 'Lunar Surface',
-          lat: landmark?.lat ?? 0,
-          lon: landmark?.lon ?? 0,
+          lat: landmark?.lat ?? latitude,
+          lon: landmark?.lon ?? longitude,
           type: landmark?.type || 'Surface',
         },
       }));
-      if (landmark?.name) this.updateSunForSite(landmark.name);
+      if (landmark?.name) this.updateSunForSite(landmark.name, landmark.lat, landmark.lon);
     };
 
     this.currentAnimFrame = requestAnimationFrame(tick);
@@ -350,28 +370,73 @@ export class MoonCameraController {
     });
   };
 
-  private handlePointerUp = (event: PointerEvent) => {
+  private handleAuxClick = (event: MouseEvent) => {
+    if (event.button === 1) event.preventDefault();
+  };
+
+  private handleMiddlePointerDown = (event: PointerEvent) => {
+    if (event.button !== 1 || event.target !== this.element) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (this.isAnimating) return;
+
+    const hit = this.intersectMoon(event.clientX, event.clientY);
     const moon = this.getMoon();
-    if (event.button !== 0 || !moon || this.isAnimating || event.target !== this.element) return;
+    if (!hit || !moon) return;
+
+    const normal = moon.worldToLocal(hit.point.clone()).normalize();
+    window.dispatchEvent(new CustomEvent('moonaddsite', {
+      detail: {
+        lat: THREE.MathUtils.radToDeg(Math.asin(THREE.MathUtils.clamp(normal.y, -1, 1))),
+        lon: THREE.MathUtils.radToDeg(Math.atan2(normal.x, normal.z)),
+      },
+    }));
+  };
+
+  private handleCustomSitesChange = (event: Event) => {
+    const sites = (event as CustomEvent<CustomLandingSite[]>).detail;
+    this.customLandmarks = Array.isArray(sites)
+      ? sites.map(site => ({ ...site, type: 'Landing Site', desc: 'User-added lunar landing site.' }))
+      : [];
+  };
+
+  private intersectMoon(clientX: number, clientY: number) {
+    const moon = this.getMoon();
+    const rect = this.element.getBoundingClientRect();
+    if (!moon || rect.width <= 0 || rect.height <= 0) return null;
 
     const pointer = new THREE.Vector2(
-      (event.clientX / innerWidth) * 2 - 1,
-      -(event.clientY / innerHeight) * 2 + 1,
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1,
     );
     this.raycaster.setFromCamera(pointer, this.camera);
-    const meshes: THREE.Mesh[] = [];
+    const meshes: THREE.Object3D[] = [];
     moon.traverse(child => {
       if (child instanceof THREE.Mesh) meshes.push(child);
     });
-    const hit = this.raycaster.intersectObjects(meshes, true)[0];
-    if (!hit) return;
+    return this.raycaster.intersectObjects(meshes, true)[0] ?? null;
+  }
+
+  private handlePointerUp = (event: PointerEvent) => {
+    if (event.button !== 0 || this.isAnimating || event.target !== this.element) return;
+    const moon = this.getMoon();
+    const hit = this.intersectMoon(event.clientX, event.clientY);
+    if (!hit || !moon) return;
 
     const hitPoint = hit.point.clone();
     const hitDirection = hitPoint.clone().normalize();
+    const localDirection = moon.worldToLocal(hitPoint.clone()).normalize();
     const cosineEightDegrees = Math.cos(8 * Math.PI / 180);
     let bestLandmark: Landmark | null = null;
     let bestDot = cosineEightDegrees;
-    for (const landmark of LANDMARKS) {
+    const landmarks = [
+      ...LANDMARKS,
+      ...APOLLO_SITES.map(site => ({
+        name: site.name, lat: site.lat, lon: site.lon, type: 'Landing Site', desc: site.description,
+      })),
+      ...this.customLandmarks,
+    ];
+    for (const landmark of landmarks) {
       const latitude = landmark.lat * Math.PI / 180;
       const longitude = landmark.lon * Math.PI / 180;
       const landmarkDirection = new THREE.Vector3(
@@ -379,7 +444,7 @@ export class MoonCameraController {
         Math.sin(latitude),
         Math.cos(latitude) * Math.cos(longitude),
       );
-      const dot = hitDirection.dot(landmarkDirection);
+      const dot = localDirection.dot(landmarkDirection);
       if (dot > bestDot) {
         bestDot = dot;
         bestLandmark = landmark;

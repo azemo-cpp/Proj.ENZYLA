@@ -52,7 +52,7 @@ export function buildDoctorPrompt(incident, files) {
 }
 
 // Returns a proposal as text only. Hindi ina-apply sa kahit anong file.
-export async function proposeFix(incident, files, provider, { timeoutMs = 120000 } = {}) {
+export async function proposeFix(incident, files, provider, { timeoutMs = 300000 } = {}) {
   const prompt = buildDoctorPrompt(incident, files);
   const execution = await monitorExecution(
     signal => provider.run(prompt, signal),

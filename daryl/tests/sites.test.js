@@ -46,7 +46,7 @@ test("the parser gives clear errors for a changed format", () => {
   assert.throws(() => parseApolloSites("APOLLO_SITES = [ { id: 'A', name: 'A', lat: 95, lon: 2 } ]"), /out of range/);
 });
 
-test("the site data was loaded from the bundled LROC sites", () => {
+test("the site data was loaded from Enzyla's apolloSites.ts", () => {
   assert.ok(SITES.length > 0, SITES_ERROR ?? "the site list is empty");
   assert.equal(SITES_ERROR, null);
   for (const [name, lat, lon] of SITES) {
